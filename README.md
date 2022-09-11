@@ -3,8 +3,8 @@ A mod that allows multiple mods which modify name-tag attributes to peacefully c
 
 ## Usage:
 Update all mods which call player.set_nametag_attributes() to:
-	(1) Register their order, prefix, and suffix, by calling configure_nametag(mod_name: string, order: number, prefix, suffix); and
-	(2) Call player.set_nametag_attribute(mod_name, text, color), instead of player.set_nametag_attributes().
+	(1) Register themselves, by adding a named, {prefix = ?, suffix = ?, color = ?} table to the "nametag_mgr_modifiers" storage string; and
+	(2) Call nametag_mgr.set_player_text(playerName, modifierName, text), instead of player.set_nametag_attributes().
 
 ## Caveats
-- (None yet.)
+- Only one nametag modifier (the last one added to the "nametag_mgr_modifiers" storage string) will win out on setting the nametag color.
