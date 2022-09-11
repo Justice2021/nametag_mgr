@@ -1,7 +1,7 @@
 # Name-tag Manager Mod for Minetest
 A mod that allows multiple mods which modify name-tag attributes to peacefully coexist. (No more "dueling banjos".)
 
-## Usage:
+## Usage
 Update all mods which call player.set_nametag_attributes() to:
 	(1) Register themselves, by adding a named, {prefix = ?, suffix = ?, color = ?} table to the "nametag_mgr_modifiers" storage string; and
 	(2) Call nametag_mgr.set_player_text(playerName, modifierName, text), instead of player.set_nametag_attributes().
