@@ -1,126 +1,114 @@
--- Initialization {
-	local storage = minetest.get_mod_storage()
+local storage = minetest.get_mod_storage()
 
-	nametag_mgr = {}
+nametag_mgr = {debugging = false}
 
-	nametag_mgr.modifiers = minetest.deserialize(storage:get_string("nametag_mgr_modifiers"))
-	if not nametag_mgr.modifiers   -- No modifiers yet?
-		nametag_mgr.modifiers = {}   -- Initialize to an empty list.
-		storage:set_string("nametag_mgr_modifiers", minetest.serialize(nametag_mgr))   -- Save in storage.
-	end
--- } Initialization
+local function debug(message)
+    if not nametag_mgr.debugging then return end
+    minetest.chat_send_all("nametag_mgr debug: "..message)
+end
 
-function nametag_mgr.update_player(playerName)
+local function get_modifiers()   -- Load, with on-demand creation.
+    local serializedModifiers = storage:get_string("nametag_mgr.modifiers")
+    debug("Serialized modifiers loaded: "..serializedModifiers)
+	local modifiers = minetest.deserialize(serializedModifiers)
+	if not modifiers then
+        debug("No modifiers found. Initializing to empty list.")
+        modifiers = {}
+    end
+	return modifiers
+end
+
+local function set_modifiers(modifiers)   -- Save.
+    local serializedModifiers = minetest.serialize(modifiers)
+    debug("Saving serializedModifiers: "..serializedModifiers)
+	storage:set_string("nametag_mgr.modifiers", serializedModifiers)
+end
+
+function nametag_mgr.ensure_modifier(modifierName, prefix, suffix)
+	local modifiers = get_modifiers()   -- Load.
+    local modifier = modifiers[modifierName]
+    if not modifier then
+        modifier = {prefix = "", suffix = "", groups = {}}
+    end
+	modifier.prefix = prefix
+    modifier.suffix = suffix
+    modifiers[modifierName] = modifier
+	set_modifiers(modifiers)   -- Save.
+    debug("Ensured modifier, "..modifierName..', with prefix, "'..prefix..'", and suffix, "'..suffix..'".')
+end
+
+function nametag_mgr.ensure_modifier_group(modifierName, groupName, color)
+	local modifiers = get_modifiers()   -- Load.
+    local groups = modifiers[modifierName].groups
+    if not groups then groups = {} end
+    if not color then color = "#FFFFFF" end
+    groups[groupName] = color
+    modifiers[modifierName].groups = groups
+	set_modifiers(modifiers)   -- Save.
+    debug("Added group, "..groupName..", to modifier, "..modifierName..", with color, "..color..".")
+end
+
+function nametag_mgr.set_player_modifier_group(playerName, modifierName, group)
 	local player = minetest.get_player_by_name(playerName)
-	local nametag = ""
-	for modifierName, modifier in ipairs(nametag_mgr.modifiers) do
-		local text = player:get_attribute("nametag-modifier-" .. modifierName .. '-text')
-		if text then
-			local prefix = modifier.prefix
-			if prefix then nametag ..= prefix end
-			
-			nametag ..= text
-			
-			local suffix = properties.suffix
-			if suffix then nametag ..= suffix end
-		end
-	end
-	player:set_nametag_attributes({text = nametag})
+	player:set_attribute("nametag-modifier-"..modifierName.."-group", group)
+    debug("Set "..playerName.."'s "..modifierName.." group to "..group..".")
 end
 
-function nametag_mgr.set_player_modifier_text(playerName, modifierName, text)
-	local player = minetest.get_player_by_name(playerName)
-	player:set_attribute("nametag-modifier-" .. modifierName .. "-text", text)
-	nametag_mgr.update_player(playerName)
-end
-
-minetest.register_on_joinplayer(function(player)   -- TODO: Update. Still contains coop_factions version.
-    if not player:get_attribute("faction") then
-        player:set_attribute("faction", "neutral")
-    end
-
-    if type(minetest.deserialize(player:get_attribute("faction"))) == "table" then
-       player:set_attribute("faction", "neutral")
-    end
-
-    local nick = player:get_attribute("faction")
-
-    if not factions.player_factions[player:get_player_name()] then
-        factions.player_factions[player:get_player_name()] = nick
-        storage:set_string("player_factions", minetest.serialize(factions.player_factions))
-    end
-
-    local x = minetest.deserialize(storage:get_string("faction_color"))
-
-    if not x then
-        x = {}
-
-        x[player:get_attribute("faction")] = {
-            r = 255,
-            b = 255,
-            g = 255
-        }
-
-        storage:set_string("faction_color", minetest.serialize(x))
-    end
-    if minetest.settings:get_bool("allow_starting_faction") then
-        local colors = x[player:get_attribute("faction")]
-        local privs = minetest.get_player_privs(player:get_player_name())
-        privs.start_faction = true
-        minetest.set_player_privs(player:get_player_name(), privs)
-    end
-
-    if nick then
-        player:set_nametag_attributes({text = "(" .. nick .. ")" .. " " .. player:get_player_name(), color = colors})
-    end
-end) 
-
-local function rgb_to_hex(rgb)   -- TODO: Will we need this?
-    local hexadecimal = '#'
-    for key, fval in ipairs({'r', 'g', 'b'}) do
-        local value = tonumber(rgb[fval])
-        local hex = ''
-        while(value > 0) do
-            local index = math.fmod(value, 16) + 1
-            value = math.floor(value / 16)
-            hex = string.sub('0123456789ABCDEF', index, index) .. hex            
-        end
-
-        if(string.len(hex) == 0)then
-            hex = '00'
-
-        elseif(string.len(hex) == 1)then
-            hex = '0' .. hex
-        end
-
-        hexadecimal = hexadecimal .. hex
-    end
-    return hexadecimal
-end
-
-minetest.register_on_chat_message(function(name, message)   -- TODO: Update. Still contains coop_factions version.
+minetest.register_on_chat_message(function(playerName, message)
     if (minetest.settings:get_bool("no_chat_intercept")) then
+        debug("Skipping chat interception.")
         return false
     end
-    if (minetest.get_player_by_name(name)) then
-        local x = minetest.deserialize(storage:get_string("faction_color"))
-        local player = minetest.get_player_by_name(name)
-        if not x then
-            x = {}
+    debug("Intercepting chat.")
 
-            x[player:get_attribute("faction")] = {
-                r = 255,
-                b = 255,
-                g = 255
-            }
+    debug("Chatting player: "..playerName)
+    local player = minetest.get_player_by_name(playerName)
+    if not player then
+        debug("Player not found with get_player_by_name.")
+        return false
+    end
+    debug("Player found with get_player_by_name.")
 
-            storage:set_string("faction_color", minetest.serialize(x))
+	local modifiers = get_modifiers()   -- Load.
+    local nameTag = ""
+    for modifierName, modifier in pairs(modifiers) do
+        debug("Checking modifier, "..modifierName..":")
+        for key, value in pairs(modifier) do
+            if type(value) == "table" then value = "(table)" end
+            debug("    "..key..": "..value)
         end
+        local group = player:get_attribute("nametag-modifier-"..modifierName.."-group")
+        if group then
+            debug("Player, "..playerName.."'s "..modifierName.." group: "..group)
 
-        local colors = x[player:get_attribute("faction")]
-        minetest.chat_send_all(minetest.get_color_escape_sequence(rgb_to_hex(colors)) .. " [" .. minetest.get_player_by_name(name):get_attribute("faction") .. "]  <".. name .. "> " ..message)
-        return true
-    else
-        return false
+            local color = modifier.groups[group]
+            local changedColor = false
+            if color then
+                debug("color: "..color)
+                nameTag = nameTag..minetest.get_color_escape_sequence(color)
+                changedColor = true
+            else
+                debug("No color.")
+            end
+
+            local prefix = modifier.prefix
+            if prefix then nameTag = nameTag..prefix end
+
+            nameTag = nameTag..group
+
+            local suffix = modifier.suffix
+            if suffix then nameTag = nameTag..suffix end
+            
+            if changedColor then nameTag = nameTag..minetest.get_color_escape_sequence("#ffffff") end
+        else
+            debug("Player, "..playerName..", does not have a "..modifierName.." modifier.")
+        end
     end
+
+    debug("nameTag: "..nameTag)
+    nameTag = playerName..nameTag..": "
+
+    debug("Sending chat message.")
+    minetest.chat_send_all(nameTag..message)
+    return true
 end)
