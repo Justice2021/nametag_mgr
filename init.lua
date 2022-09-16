@@ -2,73 +2,77 @@ local storage = minetest.get_mod_storage()
 
 nametag_mgr = {}
 
-local function get_modifiers()   -- Load, with on-demand creation.
-	local serializedModifiers = storage:get_string("nametag_mgr.modifiers")
-	local modifiers = minetest.deserialize(serializedModifiers)
-	if not modifiers then
-		modifiers = {}
-	end
-	return modifiers
+-- Magic strings, so called {
+	local modsKey = "nametag_mgr.mods"
+	local white = "#FFFFFF"
+	local groupAttributePrefix = "nametag-mod-"
+	local groupAttributeSuffix = "-group"
+-- } Magic strings, so called
+
+local function get_mods()   -- Load mods that have registered themselves with us, with on-demand creation.
+	local serializedMods = storage:get_string(modsKey)
+	local mods = minetest.deserialize(serializedMods)
+	if not mods then return {} end
+	return mods
 end
 
-local function set_modifiers(modifiers)   -- Save.
-	local serializedModifiers = minetest.serialize(modifiers)
-	storage:set_string("nametag_mgr.modifiers", serializedModifiers)
+local function set_mods(mods)   -- Save mods that have registered themselves with us.
+	local serializedMods = minetest.serialize(mods)
+	storage:set_string(modsKey, serializedMods)
 end
 
-function nametag_mgr.ensure_modifier(modifierName, prefix, suffix)
-	local modifiers = get_modifiers()   -- Load.
-	local modifier = modifiers[modifierName]
-	if not modifier then
-		modifier = {prefix = "", suffix = "", groups = {}}
-	end
-	modifier.prefix = prefix
-	modifier.suffix = suffix
-	modifiers[modifierName] = modifier
-	set_modifiers(modifiers)   -- Save.
+function nametag_mgr.register_mod(modName, prefix, suffix)
+	local mods = get_mods()   -- Load.
+	local mod = mods[modName]
+	if mod then
+		mod.prefix = prefix
+		mod.suffix = suffix
+	else mod = {prefix = prefix, suffix = suffix, groups = {}} end
+	mods[modName] = mod
+	set_mods(mods)   -- Save.
 end
 
-function nametag_mgr.ensure_modifier_group(modifierName, groupName, color)
-	local modifiers = get_modifiers()   -- Load.
-	local groups = modifiers[modifierName].groups
-	if not groups then groups = {} end
-	if not color then color = "#FFFFFF" end
-	groups[groupName] = color
-	modifiers[modifierName].groups = groups
-	set_modifiers(modifiers)   -- Save.
+function nametag_mgr.register_mod_group(modName, groupName, color)
+	local mods = get_mods()   -- Load.
+	local groups = mods[modName].groups
+	if not groups then groups = {} end   -- Initialize to empty group list for this mod.
+	if not color then color = white end   -- Default group color to white.
+	groups[groupName] = color   -- Set this group's color.
+	mods[modName].groups = groups   -- Reassign this groups list into the mod.
+	set_mods(mods)   -- Save.
 end
 
-function nametag_mgr.set_player_modifier_group(playerName, modifierName, group)
+function nametag_mgr.set_player_mod_group(playerName, modName, groupName)
 	local player = minetest.get_player_by_name(playerName)
-	player:set_attribute("nametag-modifier-"..modifierName.."-group", group)
+	player:set_attribute(groupAttributePrefix..modName..groupAttributeSuffix, groupName)
 end
 
 minetest.register_on_chat_message(function(playerName, message)
 	if (minetest.settings:get_bool("no_chat_intercept")) then return false end
 
 	local player = minetest.get_player_by_name(playerName)
-	if not player then return false end 
+	if not player then return false end   -- This shouldn't be possible, but just in case...
 
-	local modifiers = get_modifiers()   -- Load.
+	local mods = get_mods()   -- Load.
 	local nameTag = ""
-	for modifierName, modifier in pairs(modifiers) do
-		local group = player:get_attribute("nametag-modifier-"..modifierName.."-group")
+	for modName, mod in pairs(mods) do
+		local group = player:get_attribute(groupAttributePrefix..modName..groupAttributeSuffix)
 		if group then
-			local color = modifier.groups[group]
+			local color = mod.groups[group]
 			local changedColor = false
 			if color then
 				nameTag = nameTag..minetest.get_color_escape_sequence(color)
 				changedColor = true
 			end
-			local prefix = modifier.prefix
+			local prefix = mod.prefix
 			if prefix then nameTag = nameTag..prefix end
 
 			nameTag = nameTag..group
 
-			local suffix = modifier.suffix
+			local suffix = mod.suffix
 			if suffix then nameTag = nameTag..suffix end
-            
-			if changedColor then nameTag = nameTag..minetest.get_color_escape_sequence("#ffffff") end
+
+			if changedColor then nameTag = nameTag..minetest.get_color_escape_sequence(white) end
 		end
 	end
 
