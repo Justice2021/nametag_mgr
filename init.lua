@@ -73,10 +73,6 @@ minetest.register_on_chat_message(function(playerName, message)
 	local nameTag = ""
 	for modifierName, modifier in pairs(modifiers) do
 		debug("Checking modifier, "..modifierName..":")
-		for key, value in pairs(modifier) do
-			if type(value) == "table" then value = "(table)" end
-			debug("    "..key..": "..value)
-		end
 		local group = player:get_attribute("nametag-modifier-"..modifierName.."-group")
 		if group then
 			debug("Player, "..playerName.."'s "..modifierName.." group: "..group)
