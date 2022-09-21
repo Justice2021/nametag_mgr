@@ -42,9 +42,11 @@ function nametag_mgr.register_mod_group(modName, groupName, color)
 	set_mods(mods)   -- Save.
 end
 
-function nametag_mgr.set_player_mod_group(playerName, modName, groupName)
-	local player = minetest.get_player_by_name(playerName)
+function nametag_mgr.set_player_mod_group(player, modName, groupName)
+	if type(player) == "string" then player = minetest.get_player_by_name(player) end
+	if not player then return false, "Player not found." end
 	player:set_attribute(groupAttributePrefix..modName..groupAttributeSuffix, groupName)
+	return true
 end
 
 minetest.register_on_chat_message(function(playerName, message)
