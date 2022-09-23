@@ -32,12 +32,12 @@ function nametag_mgr.register_mod(modName, prefix, suffix)
 	set_mods(mods)   -- Save.
 end
 
-function nametag_mgr.register_mod_group(modName, groupName, color)
+function nametag_mgr.register_mod_group(modName, groupName, colour)
 	local mods = get_mods()   -- Load.
 	local groups = mods[modName].groups
 	if not groups then groups = {} end   -- Initialize to empty group list for this mod.
-	if not color then color = white end   -- Default group color to white.
-	groups[groupName] = color   -- Set this group's color.
+	if not colour then colour = white end   -- Default group colour to white.
+	groups[groupName] = colour   -- Set this group's colour.
 	mods[modName].groups = groups   -- Reassign this groups list into the mod.
 	set_mods(mods)   -- Save.
 end
@@ -60,11 +60,11 @@ minetest.register_on_chat_message(function(playerName, message)
 	for modName, mod in pairs(mods) do
 		local group = player:get_attribute(groupAttributePrefix..modName..groupAttributeSuffix)
 		if group then
-			local color = mod.groups[group]
-			local changedColor = false
-			if color then
-				nameTag = nameTag..minetest.get_color_escape_sequence(color)
-				changedColor = true
+			local colour = mod.groups[group]
+			local changedColour = false
+			if colour then
+				nameTag = nameTag..minetest.get_color_escape_sequence(colour)
+				changedColour = true
 			end
 			local prefix = mod.prefix
 			if prefix then nameTag = nameTag..prefix end
@@ -74,7 +74,7 @@ minetest.register_on_chat_message(function(playerName, message)
 			local suffix = mod.suffix
 			if suffix then nameTag = nameTag..suffix end
 
-			if changedColor then nameTag = nameTag..minetest.get_color_escape_sequence(white) end
+			if changedColour then nameTag = nameTag..minetest.get_color_escape_sequence(white) end
 		end
 	end
 
